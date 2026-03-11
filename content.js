@@ -154,8 +154,10 @@ function addStremioStreamingOption(popup) {
 
   const stremioItem = document.createElement("a");
 
+  stremioItem.className = "ipc-list__item stremio-option";
   stremioItem.setAttribute("role", "menuitem");
   stremioItem.href = "#";
+  stremioItem.target = "_self";
 
   const iconUrl = chrome.runtime.getURL("icons/streimo-imdb.png");
 
@@ -163,13 +165,22 @@ function addStremioStreamingOption(popup) {
     <span class="ipc-list-item__text" role="presentation">
       <div style="display:flex;align-items:center;gap:10px;">
         <div style="width:50px;height:50px;display:flex;align-items:center;justify-content:center;">
-          <img src="${iconUrl}" alt="Stremio" style="width:100%;height:100%;">
+          <img src="${iconUrl}" alt="Stremio" style="width:100%;height:100%; border-radius:12px;">
         </div>
         <div>
           <div>Stremio</div>
           <div style="font-size:12px;opacity:0.7;">Open in Stremio</div>
         </div>
       </div>
+    </span>
+
+    <span class="ipc-list-item__icon ipc-list-item__icon--post" role="presentation">
+      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24"
+        class="ipc-icon ipc-icon--launch"
+        viewBox="0 0 24 24"
+        fill="currentColor">
+        <path d="M16 16.667H8A.669.669 0 0 1 7.333 16V8c0-.367.3-.667.667-.667h3.333c.367 0 .667-.3.667-.666C12 6.3 11.7 6 11.333 6h-4C6.593 6 6 6.6 6 7.333v9.334C6 17.4 6.6 18 7.333 18h9.334C17.4 18 18 17.4 18 16.667v-4c0-.367-.3-.667-.667-.667-.366 0-.666.3-.666.667V16c0 .367-.3.667-.667.667zm-2.667-10c0 .366.3.666.667.666h1.727L9.64 13.42a.664.664 0 1 0 .94.94l6.087-6.087V10c0 .367.3.667.666.667.367 0 .667-.3.667-.667V6h-4c-.367 0-.667.3-.667.667z"></path>
+      </svg>
     </span>
   `;
 
