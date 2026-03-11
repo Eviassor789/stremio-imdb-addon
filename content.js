@@ -159,7 +159,7 @@ function addStremioStreamingOption(popup) {
   stremioItem.href = "#";
   stremioItem.target = "_self";
 
-  const iconUrl = chrome.runtime.getURL("icons/streimo-imdb.png");
+  const iconUrl = chrome.runtime.getURL("icons/imdb-to-stremio.png");
 
   stremioItem.innerHTML = `
     <span class="ipc-list-item__text" role="presentation">
