@@ -47,14 +47,89 @@ function detectContentType() {
   return "movie";
 }
 
-function getHeaderElement(isEpisodePage) {
+async function resolveStremioType(imdbId) {
+  try {
+
+    const [movieRes, seriesRes] = await Promise.all([
+      fetch(`https://v3-cinemeta.strem.io/catalog/movie/top/search=${imdbId}.json`),
+      fetch(`https://v3-cinemeta.strem.io/catalog/series/top/search=${imdbId}.json`)
+    ]);
+
+    const movieData = movieRes.ok ? await movieRes.json() : null;
+    const seriesData = seriesRes.ok ? await seriesRes.json() : null;
+
+    if (seriesData?.metas?.length) return "series";
+    if (movieData?.metas?.length) return "movie";
+
+    const seriesResRetry = await Promise(fetch(`https://v3-cinemeta.strem.io/catalog/series/top/search=${imdbId}.json`));
+
+    if (seriesResRetry.ok) {
+      const seriesDataRetry = await seriesResRetry.json();
+      if (seriesDataRetry?.metas?.length) return "series";
+    }
+
+  } catch (err) {
+    console.warn("Stremio lookup failed", err);
+  }
+
+  return "movie";
+}
+
+function waitForElement(selector, timeout = 10000) {
+  return new Promise((resolve) => {
+
+    const existing = document.querySelector(selector);
+    if (existing) return resolve(existing);
+
+    const observer = new MutationObserver(() => {
+      const el = document.querySelector(selector);
+      if (el) {
+        observer.disconnect();
+        resolve(el);
+      }
+    });
+
+    observer.observe(document.body, {
+      childList: true,
+      subtree: true
+    });
+
+    setTimeout(() => observer.disconnect(), timeout);
+  });
+}
+
+function waitForReviewsElement(callback) {
+
+  const existing = document.querySelector('[data-testid="reviewContent-all-reviews"]');
+  if (existing) {
+    callback(existing);
+    return;
+  }
+
+  const observer = new MutationObserver(() => {
+    const reviews = document.querySelector('[data-testid="reviewContent-all-reviews"]');
+
+    if (reviews) {
+      observer.disconnect();
+      callback(reviews);
+    }
+  });
+
+  observer.observe(document.body, {
+    childList: true,
+    subtree: true
+  });
+}
+
+async function getHeaderElement(isEpisodePage) {
+
   if (isEpisodePage) {
-    return document.querySelector(
-      '[data-testid="hero-parent"] > :nth-child(4) > :nth-child(2) > :nth-child(2) > :nth-child(2)'
+    return await waitForElement(
+      '[data-testid="reviewContent-all-reviews"]'
     );
   }
 
-  return document.querySelector("h1");
+  return await waitForElement("h1");
 }
 
 /* ---------------------------
@@ -82,38 +157,42 @@ function attachButton(header, button, prepend = false) {
    Main Button Logic
 --------------------------- */
 
-function addStremioButton() {
-  const imdbId = getImdbIdFromUrl();
-  if (!imdbId) return;
+// async function addStremioButton() {
 
-  const episodeData = getSeriesEpisodeData();
-  const type = detectContentType();
+//   const imdbId = getImdbIdFromUrl();
+//   if (!imdbId) return;
 
-  const isEpisodePage = Boolean(episodeData);
-  const header = getHeaderElement(isEpisodePage);
-  if (!header) return;
+//   const episodeData = getSeriesEpisodeData();
+//   const type = detectContentType();
 
-  const buttonText = isEpisodePage
-    ? `▶ Play S${episodeData.season} - E${episodeData.episode} in Stremio`
-    : "▶ Watch in Stremio";
+//   const isEpisodePage = Boolean(episodeData);
 
-  const buttonClass = isEpisodePage
-    ? "circular-strmio-button"
-    : "stremio-button";
+//   const header = await getHeaderElement(isEpisodePage);
+//   if (!header) return;
 
-  const button = createStremioButton(buttonText, buttonClass);
+//   if (header.parentElement.querySelector(".stremio-button")) return;
 
-  button.onclick = () => {
-    if (episodeData) {
-      window.location.href =
-        `stremio:///detail/series/${episodeData.seriesId}/${episodeData.seriesId}%3A${episodeData.season}%3A${episodeData.episode}`;
-    } else {
-      window.location.href = `stremio:///detail/${type}/${imdbId}`;
-    }
-  };
+//   const buttonText = isEpisodePage
+//     ? `▶ Play S${episodeData.season}.E${episodeData.episode} in Stremio`
+//     : "▶ Watch in Stremio";
 
-  attachButton(header, button, isEpisodePage);
-}
+//   const buttonClass = isEpisodePage
+//     ? "circular-strmio-button"
+//     : "stremio-button";
+
+//   const button = createStremioButton(buttonText, buttonClass);
+
+//   button.onclick = () => {
+//     if (episodeData) {
+//       window.location.href =
+//         `stremio:///detail/series/${episodeData.seriesId}/${episodeData.seriesId}%3A${episodeData.season}%3A${episodeData.episode}`;
+//     } else {
+//       window.location.href = `stremio:///detail/${type}/${imdbId}`;
+//     }
+//   };
+
+//   attachButton(header, button, isEpisodePage);
+// }
 
 /* -------------------------------------------------------------------------------------------- */
 
@@ -194,7 +273,65 @@ function addStremioStreamingOption(popup) {
   list.appendChild(stremioItem);
 }
 
+function createButtonToCards() {
+  const cards = document.querySelectorAll(".ipc-poster-card");
+  
+  const typeCache = {};
 
+  cards.forEach(card => {
+    if (card.querySelector(".stremio-button")) return;
+
+    const titleLink = card.querySelector('.ipc-poster-card__title[href*="/title/"]');
+    if (!titleLink) return;
+
+    const match = titleLink.href.match(/title\/(tt\d+)/);
+    if (!match) return;
+
+    const imdbId = match[1];
+
+    const actions = card.querySelector(".ipc-poster-card__actions");
+    if (!actions) return;
+
+    const button = document.createElement("a");
+
+    button.className =
+      "ipc-btn ipc-btn--single-padding ipc-btn--center-align-content ipc-btn--default-height ipc-btn--core-baseAlt ipc-btn--theme-baseAlt ipc-btn--button-radius ipc-btn--on-textPrimary ipc-text-button card-action-button stremio-button stremio-card-button";
+
+    button.href = `stremio:///detail/movie/${imdbId}`;
+    button.innerHTML = `
+      <span class="ipc-btn__text">Stremio</span>
+    `;
+    button.innerHTML = `
+      <span class="ipc-btn__text">▶ Watch in Stremio</span>
+    `;
+
+    button.onclick = async (e) => {
+      e.preventDefault();
+
+      if (!typeCache[imdbId]) {
+        typeCache[imdbId] = await resolveStremioType(imdbId);
+      }
+
+      const type = typeCache[imdbId];
+      if (!type) return;
+
+      window.location.href = `stremio:///detail/${type}/${imdbId}`;
+    };
+
+    actions.prepend(button);
+  });
+}
+
+function addButtonToCards() {
+  const observer = new MutationObserver(() => {
+    createButtonToCards();
+  });
+
+  observer.observe(document.body, {
+    childList: true,
+    subtree: true
+  });
+}
 
 
 
@@ -235,8 +372,52 @@ function universalStremioLinks() {
    Initialization
 --------------------------- */
 
-setTimeout(addStremioButton, 500);
+// addStremioButton();
+
+addButtonToCards();
 
 watchForWatchOptionsPopup();
 
 setTimeout(universalStremioLinks, 2000);
+
+
+function addStremioButtonNearReviews() {
+
+  const imdbId = getImdbIdFromUrl();
+  if (!imdbId) return;
+
+  const episodeData = getSeriesEpisodeData();
+  const type = detectContentType();
+
+  waitForReviewsElement((reviewsElement) => {
+
+    const container = reviewsElement.parentElement;
+    if (!container) return;
+
+    if (container.querySelector(".stremio-button")) return;
+
+    const buttonText = episodeData
+      ? `▶ Play S${episodeData.season}.E${episodeData.episode} in Stremio`
+      : "▶ Watch in Stremio";
+
+    const buttonClass = "circular-strmio-button"
+
+    const button = createStremioButton(buttonText, buttonClass);
+
+    button.onclick = () => {
+      if (episodeData) {
+        window.location.href =
+          `stremio:///detail/series/${episodeData.seriesId}/${episodeData.seriesId}%3A${episodeData.season}%3A${episodeData.episode}`;
+      } else {
+        window.location.href =
+          `stremio:///detail/${type}/${imdbId}`;
+      }
+    };
+
+    const referenceNode = container.children[3];
+    container.insertBefore(button, referenceNode);
+    
+  });
+}
+
+addStremioButtonNearReviews();
