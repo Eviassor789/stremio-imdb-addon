@@ -30,5 +30,10 @@
     }
   ],
 
-  "permissions": ["activeTab"]
+  "background": {
+    "service_worker": "background.js"
+  },
+
+  "permissions": ["activeTab", "contextMenus"]
+  
 }

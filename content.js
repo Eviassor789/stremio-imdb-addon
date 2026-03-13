@@ -35,7 +35,7 @@ function getSeriesEpisodeData() {
 }
 
 function detectContentType() {
-  const metadata = document.body.innerText.toLowerCase();
+  const metadata = document.querySelector('[data-testid="hero-parent"]')?.innerText.toLowerCase() || "";
 
   if (
     metadata.includes("tv series") ||
@@ -413,3 +413,21 @@ watchForWatchOptionsPopup();
 addStremioButtonNearReviews();
 
 setTimeout(universalStremioLinks, 2000);
+
+chrome.runtime.onMessage.addListener((message) => {
+
+  if (message.action === "openStremioSearch") {
+
+    const url = `stremio:///search?query=${message.query}`;
+
+    const link = document.createElement("a");
+    link.href = url;
+    link.style.display = "none";
+
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+
+  }
+
+});

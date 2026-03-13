@@ -16,7 +16,8 @@
 }
 
 .circular-strmio-button {
-  background: linear-gradient(135deg, #6c3df4, #8a5bff);
+  /* Your new signature color */
+  background: #6846e2; 
   color: white;
   border: none;
   padding: 10px 16px;
@@ -30,9 +31,16 @@
   align-items: center;
   gap: 6px;
   transition: all 0.2s ease;
-  box-shadow: 0 4px 12px rgba(108, 61, 244, 0.35);
+  /* Shadow updated to match a970ff */
+  /* box-shadow: 0 4px 12px rgba(169, 112, 255, 0.35); */
   width: 100%;
   height: 50px;
+}
+
+.circular-strmio-button:hover {
+  /* Just a bit darker for that "pressed" feel */
+  background: #6846e2e8;
+  box-shadow: none !important;
 }
 
 .stremio-button:hover {
