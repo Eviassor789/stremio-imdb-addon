@@ -24,7 +24,8 @@
   font-weight: 600;
   border-radius: 28px;
   cursor: pointer;
-  margin: 8px 0px;
+  margin: 0px;
+  margin-bottom: 8px;
   display: inline-flex;
   align-items: center;
   gap: 6px;

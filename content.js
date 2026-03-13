@@ -79,7 +79,10 @@ function waitForElement(selector, timeout = 10000) {
   return new Promise((resolve) => {
 
     const existing = document.querySelector(selector);
-    if (existing) return resolve(existing);
+    if (existing) {
+      resolve(existing);
+      return;
+    }
 
     const observer = new MutationObserver(() => {
       const el = document.querySelector(selector);
@@ -94,20 +97,23 @@ function waitForElement(selector, timeout = 10000) {
       subtree: true
     });
 
-    setTimeout(() => observer.disconnect(), timeout);
+    setTimeout(() => {
+      observer.disconnect();
+      resolve(null); // important so await doesn't hang
+    }, timeout);
   });
 }
 
 function waitForReviewsElement(callback) {
 
-  const existing = document.querySelector('[data-testid="reviewContent-all-reviews"]');
+  const existing = document.querySelector('[data-testid="tm-box-wl-button"]');
   if (existing) {
     callback(existing);
     return;
   }
 
   const observer = new MutationObserver(() => {
-    const reviews = document.querySelector('[data-testid="reviewContent-all-reviews"]');
+    const reviews = document.querySelector('[data-testid="tm-box-wl-button"]');
 
     if (reviews) {
       observer.disconnect();
@@ -125,7 +131,7 @@ async function getHeaderElement(isEpisodePage) {
 
   if (isEpisodePage) {
     return await waitForElement(
-      '[data-testid="reviewContent-all-reviews"]'
+      '[data-testid="tm-box-wl-button"]'
     );
   }
 
@@ -156,45 +162,6 @@ function attachButton(header, button, prepend = false) {
 /* ---------------------------
    Main Button Logic
 --------------------------- */
-
-// async function addStremioButton() {
-
-//   const imdbId = getImdbIdFromUrl();
-//   if (!imdbId) return;
-
-//   const episodeData = getSeriesEpisodeData();
-//   const type = detectContentType();
-
-//   const isEpisodePage = Boolean(episodeData);
-
-//   const header = await getHeaderElement(isEpisodePage);
-//   if (!header) return;
-
-//   if (header.parentElement.querySelector(".stremio-button")) return;
-
-//   const buttonText = isEpisodePage
-//     ? `▶ Play S${episodeData.season}.E${episodeData.episode} in Stremio`
-//     : "▶ Watch in Stremio";
-
-//   const buttonClass = isEpisodePage
-//     ? "circular-strmio-button"
-//     : "stremio-button";
-
-//   const button = createStremioButton(buttonText, buttonClass);
-
-//   button.onclick = () => {
-//     if (episodeData) {
-//       window.location.href =
-//         `stremio:///detail/series/${episodeData.seriesId}/${episodeData.seriesId}%3A${episodeData.season}%3A${episodeData.episode}`;
-//     } else {
-//       window.location.href = `stremio:///detail/${type}/${imdbId}`;
-//     }
-//   };
-
-//   attachButton(header, button, isEpisodePage);
-// }
-
-/* -------------------------------------------------------------------------------------------- */
 
 function watchForWatchOptionsPopup() {
   const observer = new MutationObserver(() => {
@@ -333,7 +300,74 @@ function addButtonToCards() {
   });
 }
 
+async function addStremioButtonNearReviews() {
 
+  const imdbId = getImdbIdFromUrl();
+  if (!imdbId) return;
+
+  const episodeData = getSeriesEpisodeData();
+  const type = detectContentType();
+
+  waitForReviewsElement(async (reviewsElement) => {
+
+    const container = reviewsElement.parentElement.parentElement;
+    if (!container) return;
+
+    if (container.querySelector(".stremio-button, .circular-strmio-button")) return;
+
+    const buttonText = episodeData
+      ? `▶ Play S${episodeData.season}.E${episodeData.episode} in Stremio`
+      : "▶ Watch in Stremio";
+
+    const buttonClass = "circular-strmio-button";
+
+    const button = createStremioButton(buttonText, buttonClass);
+
+    button.onclick = () => {
+      if (episodeData) {
+        window.location.href =
+          `stremio:///detail/series/${episodeData.seriesId}/${episodeData.seriesId}%3A${episodeData.season}%3A${episodeData.episode}`;
+      } else {
+        window.location.href =
+          `stremio:///detail/${type}/${imdbId}`;
+      }
+    };
+
+    console.log("Looking for preferred services button...");
+
+    let preferredServicesBtn =
+      container.querySelector('[data-testid="wb-setYourPreferredServicesButton"]');
+
+    if (!preferredServicesBtn) {
+      preferredServicesBtn = await waitForElement(
+        '[data-testid="wb-setYourPreferredServicesButton"]',
+        1500
+      );
+    }
+
+    if (preferredServicesBtn) {
+
+      console.log("Found preferred services button — inserting after first element");
+
+      const firstChild = container.firstElementChild;
+
+      if (firstChild?.nextSibling) {
+        container.insertBefore(button, firstChild.nextSibling);
+      } else {
+        container.appendChild(button);
+      }
+
+    } else {
+
+      console.log("Preferred services button not found — inserting before reviews");
+
+      const referenceNode = reviewsElement.parentElement;
+      container.insertBefore(button, referenceNode);
+
+    }
+
+  });
+}
 
 /* ---------------------------
    Universal IMDb Links
@@ -372,52 +406,10 @@ function universalStremioLinks() {
    Initialization
 --------------------------- */
 
-// addStremioButton();
-
 addButtonToCards();
 
 watchForWatchOptionsPopup();
 
-setTimeout(universalStremioLinks, 2000);
-
-
-function addStremioButtonNearReviews() {
-
-  const imdbId = getImdbIdFromUrl();
-  if (!imdbId) return;
-
-  const episodeData = getSeriesEpisodeData();
-  const type = detectContentType();
-
-  waitForReviewsElement((reviewsElement) => {
-
-    const container = reviewsElement.parentElement;
-    if (!container) return;
-
-    if (container.querySelector(".stremio-button")) return;
-
-    const buttonText = episodeData
-      ? `▶ Play S${episodeData.season}.E${episodeData.episode} in Stremio`
-      : "▶ Watch in Stremio";
-
-    const buttonClass = "circular-strmio-button"
-
-    const button = createStremioButton(buttonText, buttonClass);
-
-    button.onclick = () => {
-      if (episodeData) {
-        window.location.href =
-          `stremio:///detail/series/${episodeData.seriesId}/${episodeData.seriesId}%3A${episodeData.season}%3A${episodeData.episode}`;
-      } else {
-        window.location.href =
-          `stremio:///detail/${type}/${imdbId}`;
-      }
-    };
-
-    const referenceNode = container.children[3];
-    container.insertBefore(button, referenceNode);
-    
-  });
-}
-
 addStremioButtonNearReviews();
+
+setTimeout(universalStremioLinks, 2000);
