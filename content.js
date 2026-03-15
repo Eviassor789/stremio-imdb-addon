@@ -2,6 +2,45 @@
    Helpers
 --------------------------- */
 
+// Settings + runtime control
+const SETTINGS_DEFAULTS = {
+  showOnImdb: true,
+  showOnGoogle: true,
+  allowContextSearch: true
+};
+
+let extensionSettings = { ...SETTINGS_DEFAULTS };
+let _observers = {};
+
+function clearInjectedUI() {
+  // remove known injected UI elements
+  document.querySelectorAll('.stremio-button, .stremio-option, .circular-strmio-button, .stremio-card-button, #stremio-search-overlay').forEach(el => el.remove());
+  // clear Google injection marks
+  document.querySelectorAll('[data-attrid="VisualDigestWatchAction"]').forEach(p => { if (p && p.dataset.stremioInjected) { delete p.dataset.stremioInjected; } });
+}
+
+function startFeaturesBasedOnSettings() {
+  // disconnect all running observers
+  Object.values(_observers).forEach(o => { try { o && o.disconnect && o.disconnect(); } catch (e) {} });
+  _observers = {};
+
+  // remove previously injected UI so toggling off takes effect
+  clearInjectedUI();
+
+  if (extensionSettings.showOnImdb) {
+    _observers.cardsObserver = addButtonToCards();
+    _observers.popupObserver = watchForWatchOptionsPopup();
+    // one-off insertion that waits for reviews/header
+    addStremioButtonNearReviews();
+    // universal links after short delay
+    setTimeout(() => { universalStremioLinks(); }, 1000);
+  }
+
+  if (extensionSettings.showOnGoogle) {
+    _observers.googleObserver = addStremioToGoogleWhereToWatch();
+  }
+}
+
 function getImdbIdFromUrl() {
   const match = window.location.pathname.match(/title\/(tt\d+)/);
   return match ? match[1] : null;
@@ -47,7 +86,44 @@ function detectContentType() {
   return "movie";
 }
 
+// UI helpers: small purple spinner shown while resolving type
+function showStremioLoading() {
+  if (document.getElementById('stremio-search-spinner')) return;
+    const style = document.createElement('style');
+    style.id = 'stremio-search-spinner-style';
+    style.textContent = `
+      @keyframes stremio-blink { 0%,100% { opacity: 1; } 50% { opacity: 0.25; } }
+      #stremio-search-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.35); display:flex; align-items:center; justify-content:center; z-index: 999999; }
+      #stremio-search-spinner { display:flex; flex-direction:column; align-items:center; gap:10px; padding:18px; border-radius:12px; backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
+      #stremio-search-spinner .icon { width:88px; height:88px; display:block; border-radius:12px; box-shadow: 0 8px 30px rgba(124,77,255,0.25); }
+      #stremio-search-spinner .label { font-size:14px; color:#ffffff; font-family: Arial, sans-serif; }
+      #stremio-search-spinner .blink { animation: stremio-blink 1s ease-in-out infinite; }
+      @media (prefers-reduced-motion: reduce) { #stremio-search-spinner .blink { animation: none; } }
+    `;
+    document.head.appendChild(style);
+
+    const overlay = document.createElement('div');
+    overlay.id = 'stremio-search-overlay';
+
+    const iconUrl = chrome.runtime.getURL('icons/imdb-to-stremio.png');
+
+    const el = document.createElement('div');
+    el.id = 'stremio-search-spinner';
+    el.setAttribute('role','status');
+    el.innerHTML = `<img class="icon blink" src="${iconUrl}" alt="Stremio" aria-hidden="true"><div class="label">Searching Stremio...</div>`;
+    overlay.appendChild(el);
+    document.body.appendChild(overlay);
+}
+
+function hideStremioLoading() {
+  const overlay = document.getElementById('stremio-search-overlay');
+  if (overlay) overlay.remove();
+  const s = document.getElementById('stremio-search-spinner-style');
+  if (s) s.remove();
+}
+
 async function resolveStremioType(imdbId) {
+  showStremioLoading();
   try {
 
     const [movieRes, seriesRes] = await Promise.all([
@@ -61,7 +137,7 @@ async function resolveStremioType(imdbId) {
     if (seriesData?.metas?.length) return "series";
     if (movieData?.metas?.length) return "movie";
 
-    const seriesResRetry = await Promise(fetch(`https://v3-cinemeta.strem.io/catalog/series/top/search=${imdbId}.json`));
+    const seriesResRetry = await fetch(`https://v3-cinemeta.strem.io/catalog/series/top/search=${imdbId}.json`);
 
     if (seriesResRetry.ok) {
       const seriesDataRetry = await seriesResRetry.json();
@@ -70,6 +146,8 @@ async function resolveStremioType(imdbId) {
 
   } catch (err) {
     console.warn("Stremio lookup failed", err);
+  } finally {
+    hideStremioLoading();
   }
 
   return "movie";
@@ -177,32 +255,40 @@ function watchForWatchOptionsPopup() {
     childList: true,
     subtree: true
   });
+
+  return observer;
 }
 
 function addStremioStreamingOption(popup) {
 
   const list = popup.querySelector('[data-testid="STREAMING-list"]');
   if (!list) return;
-
   // prevent duplicates
   if (list.querySelector(".stremio-option")) return;
+  const titleHeader = popup.querySelector(".prompt-title-text");
+  if (!titleHeader) return;
 
-  const episodeHeader = popup.querySelector(".prompt-title-text");
-  if (!episodeHeader) return;
-
-  const match = episodeHeader.innerText.match(/S(\d+)\.E(\d+)/i);
-  if (!match) return;
-
-  const season = match[1];
-  const episode = match[2];
-
-  const seriesId = getImdbIdFromUrl();
-
+  const match = titleHeader.innerText.match(/S(\d+)\.E(\d+)/i);
+  
   const stremioItem = document.createElement("a");
+
+  const titleMatch = titleHeader.parentElement.href.match(/title\/(tt\d+)/);
+  let imdbId = titleMatch ? titleMatch[1] : null;
+  
+  let link = `stremio:///search?query=${titleHeader.innerText}`;
+  
+  
+  if (match) {
+    imdbId = getImdbIdFromUrl();
+    console.log("This is an episode page, extracting season and episode numbers");
+    const season = match[1];
+    const episode = match[2];
+    link = `stremio:///detail/series/${imdbId}/${imdbId}%3A${season}%3A${episode}`;
+  }
 
   stremioItem.className = "ipc-list__item stremio-option";
   stremioItem.setAttribute("role", "menuitem");
-  stremioItem.href = "#";
+  stremioItem.href = link;
   stremioItem.target = "_self";
 
   const iconUrl = chrome.runtime.getURL("icons/imdb-to-stremio.png");
@@ -229,13 +315,6 @@ function addStremioStreamingOption(popup) {
       </svg>
     </span>
   `;
-
-  stremioItem.onclick = (e) => {
-    e.preventDefault();
-
-    window.location.href =
-      `stremio:///detail/series/${seriesId}/${seriesId}%3A${season}%3A${episode}`;
-  };
 
   list.appendChild(stremioItem);
 }
@@ -298,6 +377,11 @@ function addButtonToCards() {
     childList: true,
     subtree: true
   });
+
+  // ensure at least one initial run
+  createButtonToCards();
+
+  return observer;
 }
 
 async function addStremioButtonNearReviews() {
@@ -412,6 +496,117 @@ watchForWatchOptionsPopup();
 
 addStremioButtonNearReviews();
 
+// Google search injection: add Stremio tile inside the "Where to watch" (VisualDigestWatchAction) panel
+function addStremioToGoogleWhereToWatch() {
+
+  if (!location.hostname.includes("google.")) return;
+
+  const iconUrl = chrome.runtime.getURL("icons/imdb-to-stremio.png");
+
+  function extractImdbIdFromPage() {
+    const imdb = document.querySelector('a[href*="imdb.com/title/tt"]');
+    if (!imdb) return null;
+
+    const m = imdb.href.match(/title\/(tt\d+)/);
+    return m ? m[1] : null;
+  }
+
+  function detectType() {
+    const kps = document.querySelectorAll('[data-maindata]');
+    const kp = (kps && kps.length > 1) ? kps[1] : (kps[0] || null);
+    if (!kp) return "movie";
+
+    try {
+      const raw = kp.getAttribute("data-maindata") || "";
+      const decoded = raw.replace(/&quot;/g, '"').replace(/&#39;/g, "'");
+      const data = JSON.parse(decoded);
+
+      console.log("Google knowledge panel data", data);
+
+      // Prefer explicit text field when available
+      const text = (data && data.text) || (typeof data === 'string' ? data : JSON.stringify(data || {}));
+
+      console.log("this is the text", text)
+
+      if (typeof text === 'string' && text.toUpperCase().includes('["TV"]')) return 'series';
+      if (typeof text === 'string' && text.toUpperCase().includes('["FILM"]')) return 'movie';
+    } catch (err) {
+      console.warn('Could not parse Google knowledge panel type', err);
+    }
+
+    return 'movie';
+  }
+
+  function inject(panel) {
+
+    if (panel.dataset.stremioInjected) return;
+
+    const imdbId = extractImdbIdFromPage();
+    const type = detectType(panel);
+
+    // providers section
+    const providersWrapper = panel.children[0]?.children[1];
+    if (!providersWrapper) return;
+
+    const providersList = providersWrapper.firstElementChild;
+    if (!providersList) return;
+
+    const firstProvider = providersList.firstElementChild;
+    if (!firstProvider) return;
+
+    // clone existing provider tile
+    const stremioTile = firstProvider.cloneNode(true);
+
+    // change icon
+    const img = stremioTile.querySelector("img");
+    if (img) img.src = iconUrl;
+
+    // change text
+    const textDiv = stremioTile.querySelector("div[dir]");
+    if (textDiv) textDiv.textContent = "Stremio";
+
+    // remove Google's tracking attributes
+    stremioTile.removeAttribute("data-ping");
+    stremioTile.removeAttribute("jsdata");
+    stremioTile.removeAttribute("jsaction");
+
+    const link = stremioTile.closest("a") || stremioTile.querySelector("a");
+
+    if (link) {
+      link.href = imdbId
+        ? `stremio:///detail/${type}/${imdbId}`
+        : `stremio:///search?query=${encodeURIComponent(document.title)}`;
+
+      link.addEventListener("click", (e) => {
+        e.preventDefault();
+        window.location.href = link.href;
+      });
+    }
+
+    providersList.appendChild(stremioTile);
+
+    panel.dataset.stremioInjected = "1";
+  }
+
+  const observer = new MutationObserver(() => {
+
+    const panel = document.querySelector('[data-attrid="VisualDigestWatchAction"]');
+
+    if (panel) inject(panel);
+
+  });
+
+  observer.observe(document.body, {
+    childList: true,
+    subtree: true
+  });
+
+  const initial = document.querySelector('[data-attrid="VisualDigestWatchAction"]');
+  if (initial) inject(initial);
+}
+
+addStremioToGoogleWhereToWatch();
+
 setTimeout(universalStremioLinks, 2000);
 
 chrome.runtime.onMessage.addListener((message) => {
@@ -430,4 +625,4 @@ chrome.runtime.onMessage.addListener((message) => {
 
   }
 
-});
+});  // TODO: stabilty, popup page on extension click, appear on google search

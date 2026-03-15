@@ -1,43 +1,96 @@
 <!DOCTYPE html>
 <html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <link rel="stylesheet" href="../styles.css">
+    <style>
+      :root {
+        --bg: #0f0f14;
+        --panel: #14141a;
+        --accent: #7b1fa2;
+        --muted: #9aa0a6;
+        --text: #fff;
+      }
+      html,body{margin:0;padding:0;background:var(--bg);color:var(--text);font-family:Inter,Segoe UI,Arial,sans-serif}
+      .popup{width:320px;padding:14px}
+      .header{display:flex;align-items:center;gap:10px}
+      .logo{width:38px;height:38px;border-radius:8px;background:linear-gradient(135deg,#8e24aa,#e040fb);display:flex;align-items:center;justify-content:center;font-weight:700}
+      .logo img{width:24px;height:24px;object-fit:contain;border-radius:6px}
+      .title{font-size:16px;font-weight:600}
+      .subtitle{font-size:12px;color:var(--muted);margin-top:2px}
+      .panel{background:var(--panel);border-radius:10px;padding:12px;margin-top:12px}
+      .row{display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.03)}
+      .row:last-child{border-bottom:0}
+      .label{display:flex;flex-direction:column}
+      .label .name{font-size:13px}
+      .label .hint{font-size:11px;color:var(--muted);margin-top:3px}
+      .toggle{position:relative;width:48px;height:28px}
+      .toggle input{display:none}
+      .switch{position:absolute;inset:0;background:rgba(255,255,255,0.06);border-radius:16px;padding:3px;transition:all .18s}
+      .knob{width:22px;height:22px;background:white;border-radius:50%;box-shadow:0 2px 6px rgba(0,0,0,0.4);transform:translateX(0);transition:transform .18s}
+      input:checked + .switch{background:linear-gradient(90deg,var(--accent),#e040fb)}
+      input:checked + .switch .knob{transform:translateX(20px)}
+      .actions{display:flex;gap:8px;margin-top:12px}
+      .btn{flex:1;padding:8px 10px;border-radius:8px;border:0;cursor:pointer;font-weight:600}
+      .btn-primary{background:linear-gradient(90deg,var(--accent),#e040fb);color:white}
+      .btn-ghost{background:transparent;border:1px solid rgba(255,255,255,0.06);color:var(--text)}
+      .small{font-size:12px;color:var(--muted);margin-top:8px;text-align:center}
+    </style>
+  </head>
+  <body>
+    <div class="popup">
+      <div class="header">
+        <div class="logo"><img src="../icons/imdb-to-stremio.png" alt="Stremio"></div>
+        <div>
+          <div class="title">Stremio Launcher</div>
+          <div class="subtitle">Quick actions & settings</div>
+        </div>
+      </div>
 
-<head>
-  <link rel="stylesheet" href="../styles.css">
-  <style>
+      <div class="panel" role="region" aria-label="Stremio settings">
+        <div class="row">
+          <div class="label">
+            <div class="name">Show Stremio on IMDb</div>
+            <div class="hint">Insert button on IMDb pages</div>
+          </div>
+          <label class="toggle">
+            <input id="toggle-imdb" type="checkbox" checked>
+            <span class="switch"><span class="knob"></span></span>
+          </label>
+        </div>
 
-    body {
-      font-family: Arial;
-      width: 220px;
-      padding: 15px;
-      background: #0f0f14;
-      color: white;
-    }
+        <div class="row">
+          <div class="label">
+            <div class="name">Show Stremio on Google results</div>
+            <div class="hint">Add Stremio tile in "Where to watch" box</div>
+          </div>
+          <label class="toggle">
+            <input id="toggle-google" type="checkbox" checked>
+            <span class="switch"><span class="knob"></span></span>
+          </label>
+        </div>
 
-    h3 {
-      margin-top: 0;
-      font-size: 16px;
-    }
+        <div class="row">
+          <div class="label">
+            <div class="name">Allow search on right click</div>
+            <div class="hint">Add a context-menu search action</div>
+          </div>
+          <label class="toggle">
+            <input id="toggle-context" type="checkbox" checked>
+            <span class="switch"><span class="knob"></span></span>
+          </label>
+        </div>
 
-    .container {
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
-    }
+        <div class="actions">
+          <button id="open" class="btn btn-primary">Open in Stremio</button>
+          <button id="reset" class="btn btn-ghost">Reset</button>
+        </div>
 
-  </style>
-</head>
+        <div class="small">Settings are saved to your browser and applied immediately.</div>
+      </div>
+    </div>
 
-<body>
-
-  <h3>Stremio Launcher</h3>
-
-  <div class="container">
-    <button id="open" class="stremio-button">
-      Open in Stremio
-    </button>
-  </div>
-
-  <script src="popup.js"></script>
-
-</body>
-</html>
+    <script src="popup.js"></script>
+  </body>
+  </html>
