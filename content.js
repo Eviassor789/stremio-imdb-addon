@@ -9,6 +9,13 @@ const SETTINGS_DEFAULTS = {
   allowContextSearch: true
 };
 
+function loadSettingsAndStart() {
+  chrome.storage.sync.get(SETTINGS_DEFAULTS, (settings) => {
+    extensionSettings = { ...SETTINGS_DEFAULTS, ...settings };
+    startFeaturesBasedOnSettings();
+  });
+}
+
 let extensionSettings = { ...SETTINGS_DEFAULTS };
 let _observers = {};
 
@@ -39,6 +46,11 @@ function startFeaturesBasedOnSettings() {
   if (extensionSettings.showOnGoogle) {
     _observers.googleObserver = addStremioToGoogleWhereToWatch();
   }
+
+  if (extensionSettings.showOnImdb) {
+    setTimeout(() => universalStremioLinks(), 1000);
+  }
+
 }
 
 function getImdbIdFromUrl() {
@@ -490,12 +502,6 @@ function universalStremioLinks() {
    Initialization
 --------------------------- */
 
-addButtonToCards();
-
-watchForWatchOptionsPopup();
-
-addStremioButtonNearReviews();
-
 // Google search injection: add Stremio tile inside the "Where to watch" (VisualDigestWatchAction) panel
 function addStremioToGoogleWhereToWatch() {
 
@@ -605,10 +611,6 @@ function addStremioToGoogleWhereToWatch() {
   if (initial) inject(initial);
 }
 
-addStremioToGoogleWhereToWatch();
-
-setTimeout(universalStremioLinks, 2000);
-
 chrome.runtime.onMessage.addListener((message) => {
 
   if (message.action === "openStremioSearch") {
@@ -625,4 +627,23 @@ chrome.runtime.onMessage.addListener((message) => {
 
   }
 
+  if (message.action === "setShowOnImdb") {
+    extensionSettings.showOnImdb = message.value;
+    startFeaturesBasedOnSettings();
+  }
+
+  if (message.action === "setShowOnGoogle") {
+    extensionSettings.showOnGoogle = message.value;
+    startFeaturesBasedOnSettings();
+  }
+
+
 });  // TODO: stabilty, popup page on extension click, appear on google search
+
+
+loadSettingsAndStart();
+
+chrome.runtime.onMessage.addListener((message) => {
+
+
+});

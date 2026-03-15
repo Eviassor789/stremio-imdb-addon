@@ -34,6 +34,9 @@
     "service_worker": "background.js"
   },
 
-  "permissions": ["activeTab", "contextMenus"]
-  
+  "permissions": [
+    "storage",
+    "contextMenus",
+    "tabs"
+  ]  
 }

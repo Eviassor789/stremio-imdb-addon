@@ -41,12 +41,23 @@ async function init() {
   $("toggle-google").checked = !!settings.showOnGoogle;
   $("toggle-context").checked = !!settings.allowContextSearch;
 
+  function updateResetButtonAppearance() {
+    const allOn = $("toggle-imdb").checked && $("toggle-google").checked && $("toggle-context").checked;
+    const btn = $("reset");
+    if (!btn) return;
+    btn.className = 'btn ' + (allOn ? 'btn-ghost' : 'btn-primary');
+  }
+
+  // set initial appearance
+  updateResetButtonAppearance();
+
   $("toggle-imdb").addEventListener('change', async (e) => {
     settings.showOnImdb = e.target.checked;
     await saveSettings({ showOnImdb: settings.showOnImdb });
     if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.sendMessage) {
       chrome.runtime.sendMessage({ action: 'setShowOnImdb', value: settings.showOnImdb });
     }
+    updateResetButtonAppearance();
   });
 
   $("toggle-google").addEventListener('change', async (e) => {
@@ -55,6 +66,7 @@ async function init() {
     if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.sendMessage) {
       chrome.runtime.sendMessage({ action: 'setShowOnGoogle', value: settings.showOnGoogle });
     }
+    updateResetButtonAppearance();
   });
 
   $("toggle-context").addEventListener('change', async (e) => {
@@ -63,6 +75,7 @@ async function init() {
     if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.sendMessage) {
       chrome.runtime.sendMessage({ action: 'setAllowContextSearch', value: settings.allowContextSearch });
     }
+    updateResetButtonAppearance();
   });
 
   $("reset").addEventListener('click', async () => {
@@ -73,31 +86,7 @@ async function init() {
     if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.sendMessage) {
       chrome.runtime.sendMessage({ action: 'settingsReset' });
     }
-  });
-
-  $("open").addEventListener('click', async () => {
-    try {
-      if (typeof chrome !== 'undefined' && chrome.tabs && chrome.tabs.query) {
-        const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-        if (tab && tab.url) {
-          const match = tab.url.match(/title\/(tt\d+)/);
-          if (match) {
-            const imdbId = match[1];
-            try { chrome.tabs.update({ url: `stremio:///detail/${imdbId}` }); return; } catch (err) {}
-            window.open(`stremio:///detail/${imdbId}`);
-            return;
-          }
-          try { chrome.tabs.update({ url: `stremio:///search?query=${encodeURIComponent(tab.title || '')}` }); return; } catch (err) {}
-          window.open(`stremio:///search?query=${encodeURIComponent(tab.title||'')}`);
-          return;
-        }
-      }
-    } catch (e) {
-      // fallthrough to direct open
-    }
-
-    const pageTitle = document.title || '';
-    window.open(`stremio:///search?query=${encodeURIComponent(pageTitle)}`);
+    updateResetButtonAppearance();
   });
 }
 
