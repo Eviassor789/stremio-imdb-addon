@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
-  "name": "Watch in Stremio",
-  "description": "Open IMDb movies and TV shows directly in Stremio.",
+  "name": "Stremio Launcher – Open from IMDb & Google",
+  "description": "Quickly open movies and TV shows in Stremio from IMDb, Google search, or the right-click menu.",
   "version": "1.0",
 
   "icons": {
@@ -17,7 +17,12 @@
 
   "content_scripts": [
     {
-      "matches": ["<all_urls>"],
+      "matches": [
+        "*://*.imdb.com/*", 
+        "*://*.google.com/*",
+        "*://*.google.co.uk/*",
+        "*://*.google.ca/*"
+      ],
       "js": ["content.js"],
       "css": ["styles.css"]
     }
@@ -26,7 +31,12 @@
   "web_accessible_resources": [
     {
       "resources": ["icons/*"],
-      "matches": ["<all_urls>"]
+      "matches": [
+        "*://*.imdb.com/*",
+        "*://*.google.com/*",
+        "*://*.google.co.uk/*",
+        "*://*.google.ca/*"
+      ]
     }
   ],
 
